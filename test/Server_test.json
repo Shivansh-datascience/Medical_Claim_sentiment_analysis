@@ -1,0 +1,7 @@
+{
+    "Server_Running_Address": "http://127.0.0.1:5000/Predict_Sentiment", 
+    "Server_host": "127.0.0.1", 
+    "Server_port": 5000, 
+    "Server_Status": "Success", 
+    "Server_status_code": 200
+}
