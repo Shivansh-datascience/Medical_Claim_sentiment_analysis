@@ -10,3 +10,6 @@ gunicorn>=23.0.0,<24
 nltk>=3.9.1,<4
 joblib>=1.5.1,<2
 python-dotenv>=1.0.1,<2
+numpy>=1.26.0,<2
+
+
