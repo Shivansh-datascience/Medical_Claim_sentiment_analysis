@@ -1,0 +1,25 @@
+# Environment
+.env
+venv/
+.conda/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Logs
+logs/
+
+# System files
+.DS_Store
+Thumbs.db
+
+# Large ML files
+*.pkl
+*.h5
+*.model
+*.csv

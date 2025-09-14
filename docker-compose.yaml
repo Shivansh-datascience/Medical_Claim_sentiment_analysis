@@ -1,0 +1,58 @@
+services:
+  # Medical Sentiment Analysis API
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: medical-sentiment-api
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=production
+      - PYTHONPATH=/app
+      - Mongo_db_url=mongodb://mongo:27017
+      - Mongo_db_database=medical_sentiment_db
+      - Mongo_db_collection=sentiment_analysis
+    volumes:
+      - ./logs:/app/logs
+      - ./notebooks:/app/notebooks:ro  # Mount models as read-only
+    depends_on:
+      mongo:
+        condition: service_healthy
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # MongoDB Database
+  mongo:
+    image: mongo:6.0   # <-- FIXED: use a valid tag
+    container_name: mongodb-sentiment
+    environment:
+      - MONGO_INITDB_DATABASE=medical_sentiment_db
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+      - ./mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - app-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  mongo_data:
