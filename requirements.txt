@@ -2,7 +2,7 @@ pymongo==4.13.2
 flask==3.1.1
 streamlit==1.47.1
 explainerdashboard==0.5.1
-tensorflow==2.13.0
+tensorflow==2.20.0
 keras==2.13.1
 spacy==3.8.7
 pydantic==2.11.7
