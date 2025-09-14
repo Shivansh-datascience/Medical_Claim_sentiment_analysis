@@ -169,10 +169,12 @@ curl -X POST http://127.0.0.1:5000/Predict_Sentiment \
   -d '{"text": "Patient recovered well after treatment"}'
 
 # Test server status
-curl -X GET http://127.0.0.1:5000/Check_Server_status
-```
+<img width="1920" height="1080" alt="Screenshot (79)" src="https://github.com/user-attachments/assets/7541fa3a-34d9-47cc-abbe-acebf70b4092" />
+
 
 ## 🎨 Frontend Usage
+
+<img width="1920" height="1080" alt="Screenshot (114)" src="https://github.com/user-attachments/assets/d4b21f43-8ec6-40fc-b511-0dd8a609b1c4" />
 
 ### Accessing the Interface
 
@@ -350,4 +352,5 @@ For support and questions:
 - [ ] API rate limiting
 - [ ] Automated model retraining
 - [ ] Cloud deployment templates
+
 
