@@ -1,14 +1,12 @@
-
 pymongo==4.13.2
 flask==3.1.1
 streamlit==1.47.1
 explainerdashboard==0.5.1
-tensorflow==2.20.0
-keras==2.20.0             
+tensorflow==2.13.0
+keras==2.13.1
 spacy==3.8.7
 pydantic==2.11.7
 gunicorn==23.0.0
 nltk==3.9.1
 joblib==1.5.1
-python-dotenv==1.0.1      
-
+python-dotenv==1.0.1
