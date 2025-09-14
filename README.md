@@ -157,6 +157,9 @@ docker-compose up --build
 2. Send POST request to sentiment analysis endpoint
 3. Include medical text in request body
 
+<img width="1920" height="1080" alt="Screenshot (74)" src="https://github.com/user-attachments/assets/494beef0-114b-4a66-a006-bebba89ed11e" />
+
+
 ### Example Test Cases
 
 ```bash
@@ -347,3 +350,4 @@ For support and questions:
 - [ ] API rate limiting
 - [ ] Automated model retraining
 - [ ] Cloud deployment templates
+
