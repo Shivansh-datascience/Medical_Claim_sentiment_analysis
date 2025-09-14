@@ -1,5 +1,5 @@
 pymongo>=4.13.2,<5
-flask>=3.1.1,<4
+flask>=2.2.0,<3.1
 streamlit>=1.47.1,<2
 explainerdashboard>=0.5.1,<1
 tensorflow>=2.20.0,<2.21
@@ -10,4 +10,3 @@ gunicorn>=23.0.0,<24
 nltk>=3.9.1,<4
 joblib>=1.5.1,<2
 python-dotenv>=1.0.1,<2
-
