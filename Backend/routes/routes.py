@@ -1,10 +1,7 @@
 import numpy as np
 from flask import Flask, request, jsonify
 from flask_cors import CORS 
-from bson import ObjectId
 from pymongo import MongoClient
-from pymongo.client_session import ClientSession
-from pymongo.asynchronous.client_session import AsyncClientSession
 from pydantic import BaseModel
 import os
 import json
@@ -14,22 +11,35 @@ import joblib
 import logging
 from dotenv import load_dotenv
 
+# -----------------------------
+# Load environment variables
+# -----------------------------
 load_dotenv()
 
+# -----------------------------
+# Setup logging
+# -----------------------------
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+# -----------------------------
+# Initialize Flask app
+# -----------------------------
 app = Flask(__name__)
-CORS(app,origins=["*"])   #using CORS Policy to act as bridge between frontend and backend 
+CORS(app, origins=["*"])  # Allow frontend to access backend APIs
 
-SERVER_NAME = '127.0.0.1'   #local host server address
-SERVER_PORT = 5000   #local host port number 
+SERVER_NAME = '127.0.0.1'  # Localhost
+SERVER_PORT = 5000          # Flask port
 
-#validate the Mongo client connection using Pydantic 
+# -----------------------------
+# MongoDB Setup
+# -----------------------------
 class Mongodb_credentials(BaseModel):
+    """Pydantic model to validate MongoDB credentials"""
     mongodb_client_url: str
 
 def Authenticate_mongodb_credentials(mongodb_client_url):
+    """Authenticate and connect to MongoDB"""
     try:
         mongo_authentication_client = MongoClient(mongodb_client_url)
         return mongo_authentication_client
@@ -37,6 +47,7 @@ def Authenticate_mongodb_credentials(mongodb_client_url):
         logger.error(connection_error)
         return None
 
+# Connect to MongoDB using credentials from environment variables
 mongo_client = Authenticate_mongodb_credentials(os.getenv("Mongo_db_url"))
 
 if mongo_client:
@@ -51,147 +62,145 @@ if mongo_client:
 else:
     print("Error in connecting to Mongo client")
 
+# -----------------------------
+# Load Machine Learning Models
+# -----------------------------
 file_path_lr = r"D:\AI_powered_Medical_sentiment_analysis\notebooks\logistic_regression.pkl"
 file_path_vectors = r"D:\AI_powered_Medical_sentiment_analysis\notebooks\Vectorize.pkl"
 
+# Load logistic regression model and vectorizer
 lr_model = joblib.load(file_path_lr)
 vectors = joblib.load(file_path_vectors)
 
-#create function to load pre trained NER model
-def load_spacy_model(model_name : str)->spacy:
-
-    #create event session for load process
+# -----------------------------
+# Load Spacy NER Model
+# -----------------------------
+def load_spacy_model(model_name: str):
+    """Load a pre-trained Spacy NER model"""
     logger.info("Loading Spacy Pretrained model from environment")
     spacy_model = spacy.load(model_name)  
-    if spacy_model is not None:
-        return spacy_model  #return model object
-    else:
-        return f"Unable to  Pull Model {model_name} from Pretrained Environment"
+    return spacy_model
 
-#create route directory to return the sentiments score
+# -----------------------------
+# Keyword-based positive sentiment detection
+# -----------------------------
+POSITIVE_KEYWORDS = ["good", "excellent", "improved", "beneficial", "successful", "happy", "recovered"]
+
+def keyword_sentiment_analysis(text: str) -> str:
+    """
+    Check if any positive keywords are present in the text.
+    Returns 'positive' if any keyword is found, otherwise 'neutral_or_negative'.
+    """
+    text_lower = text.lower()
+    for word in POSITIVE_KEYWORDS:
+        if word in text_lower:
+            return "positive"
+    return "neutral_or_negative"
+
+# -----------------------------
+# Route: Predict Sentiment
+# -----------------------------
 @app.route("/Predict_Sentiment", methods=['POST'])
 def predict_sentiment():
-
-    """ Create Exception Handling for Analyse Sentiment Behaviour"""
+    """
+    Hybrid sentiment:
+    - Positive text (keyword detected) → returns positive with model-based probability
+    - Neutral/Negative → returns LR prediction and probability
+    Also includes NER results.
+    """
     try:
-        claim_json = request.get_json(force=True)  #access json request
+        claim_json = request.get_json(force=True)
 
-        #validate the user  json input 
         if 'Medical_Claim' not in claim_json:
-            return jsonify(
-                {
-                    "error":"Missing Medical Claims Request "
-                }
-            ),400   #return the status response as 400
+            return jsonify({"error": "Missing Medical Claims Request"}), 400
 
-        claim_text = claim_json['Medical_Claim']   #access the text claim from json key
+        claim_text = claim_json['Medical_Claim']
 
-        claim_text_array = np.array([claim_text])  #convert into nupy array
-
-        vectors_text = vectors.transform(claim_text_array)  #convert into vectors 
-        
-        lr_model_pred = lr_model.predict(vectors_text)  #predict the sentiment behaviour
-
-        lr_model_pred_proba = lr_model.predict_proba(vectors_text)  #predict the sentiment score
-
-        #access the max probability
-        max_proba = float(np.max(lr_model_pred_proba[0]))
-
-        #load model function
-        model_name = "en_core_web_sm"
-        spacy_model = load_spacy_model(model_name)  #call function for load model
+        # Load Spacy model once per request
+        spacy_model = load_spacy_model("en_core_web_sm")
         spacy_model_doc = spacy_model(claim_text)
-
-
-        #iterate through all entities 
         ner_results = [{"text": ent.text, "label": ent.label_} for ent in spacy_model_doc.ents]
 
-        if lr_model_pred is not None:
-            #return the result in json format 
-            result = {
-                'Sentiment_Text':claim_text,
-            'Sentiment_Prediction': lr_model_pred[0],
-            'Sentiment_Score': max_proba,  # maximum probability
-            'NER_Results': ner_results     # return all entities
+        results_list = []
+
+        # Check for positive keywords
+        keyword_sentiment = keyword_sentiment_analysis(claim_text)
+
+        # Vectorize text
+        claim_text_array = np.array([claim_text])
+        vectors_text = vectors.transform(claim_text_array)
+        lr_model_pred_proba = lr_model.predict_proba(vectors_text)[0]
+
+        if keyword_sentiment == "positive":
+            # Get probability of positive class dynamically
+            if "positive" in lr_model.classes_:
+                positive_class_index = list(lr_model.classes_).index("positive")
+            else:
+                positive_class_index = np.argmax(lr_model_pred_proba)
+            positive_score = float(lr_model_pred_proba[positive_class_index])
+
+            positive_result = {
+                'Sentiment_Text': claim_text,
+                'Sentiment_Prediction': "positive",
+                'Sentiment_Score': round(positive_score, 2),
+                'NER_Results': ner_results
             }
-            # store in MongoDB Database 
-            try:
-                insert_result = mongo_collections.insert_one(result)
-                # Add the inserted ObjectId as a string to the response
-                result["_id"] = str(insert_result.inserted_id)
-            except Exception as db_err:
-                logger.error(f"MongoDB Insert Error: {db_err}")
-            
-            #return json message 
-            return jsonify(result)  
+            results_list.append(positive_result)
         else:
-            return jsonify(
-        {
-            'Unable To Analyse the Sentiment For Users Claim': None
-        }
-        )
-
-        
-    except Exception as e:
-        return jsonify(
-            {
-                'Exception Occurred': str(e)
+            # Neutral or negative prediction
+            lr_model_pred = lr_model.predict(vectors_text)[0]
+            max_proba = float(np.max(lr_model_pred_proba))
+            lr_result = {
+                'Sentiment_Text': claim_text,
+                'Sentiment_Prediction': lr_model_pred,
+                'Sentiment_Score': round(max_proba, 3),
+                'NER_Results': ner_results
             }
-        )
+            results_list.append(lr_result)
 
+        # Store in MongoDB
+        try:
+            for res in results_list:
+                insert_result = mongo_collections.insert_one(res)
+                res["_id"] = str(insert_result.inserted_id)
+        except Exception as db_err:
+            logger.error(f"MongoDB Insert Error: {db_err}")
 
-#create route directory to check servers status with HTTP protocol
+        return jsonify(results_list)
+
+    except Exception as e:
+        return jsonify({'Exception Occurred': str(e)})
+
+# -----------------------------
+# Route: Check Server Status
+# -----------------------------
 @app.route("/Check_Server_status", methods=['GET'])
 def check_server_running_process():
     server_address = f"http://{SERVER_NAME}:{SERVER_PORT}/Predict_Sentiment"
     file_location = r"D:\AI_powered_Medical_sentiment_analysis\test\Server_test.json"
 
     try:
-        # ✅ Correct HTTP method and payload
         server_response = requests.post(server_address, json={"Medical_Claim": "Test claim for health check."})
 
-        if server_response.status_code == 200:
-            success_message = {
-                "Server_Running_Address": server_address,
-                "Server_host": SERVER_NAME,
-                "Server_port": SERVER_PORT,
-                "Server_Status": "Success",
-                "Server_status_code": server_response.status_code
-            }
+        status_message = {
+            "Server_Running_Address": server_address,
+            "Server_host": SERVER_NAME,
+            "Server_port": SERVER_PORT,
+            "Server_Status": "Success" if server_response.status_code == 200 else "Failed",
+            "Server_status_code": server_response.status_code
+        }
 
-            with open(file_location, 'w') as file:
-                json.dump(success_message, file)
+        with open(file_location, 'w') as file:
+            json.dump(status_message, file)
 
-            return jsonify(success_message)
-        else:
-            fail_message = {
-                "Server_Address": server_address,
-                "Server_Host": SERVER_NAME,
-                "Server_port": SERVER_PORT,
-                "Server_Status": "Failed",
-                "Server_status_code": server_response.status_code
-            }
-
-            with open(file_location, 'w') as file:
-                json.dump(fail_message, file)
-
-            return jsonify(fail_message)
+        return jsonify(status_message)
 
     except Exception as e:
         return jsonify({"Exception Occurred": str(e)})
-#call the main function to run flask application
+
+# -----------------------------
+# Run Flask App
+# -----------------------------
 if __name__ == '__main__':
-
-    #authenticate flask cookies session with secret key identification
-
-    cookies_secret_key = np.random.bytes(24)  #generate 24 bytes long key
-
-    app.secret_key = cookies_secret_key  #add random number to secret key
-
-    app.run(
-        host=SERVER_NAME,port=SERVER_PORT,debug=True)
-    
-
-
-    
-    
+    app.secret_key = np.random.bytes(24)  # Generate random secret key for session security
+    app.run(host=SERVER_NAME, port=SERVER_PORT, debug=True)
