@@ -82,32 +82,42 @@ def load_spacy_model(model_name: str):
     return spacy_model
 
 # -----------------------------
-# Keyword-based positive sentiment detection
+# Keyword-based sentiment detection
 # -----------------------------
-POSITIVE_KEYWORDS = ["good", "excellent", "improved", "beneficial", "successful", "happy", "recovered"]
+POSITIVE_KEYWORDS = [
+    "good", "excellent", "improved", "beneficial", "successful", 
+    "happy", "recovered", "helpful", "friendly", "efficient", "smooth"
+]
+
+NEGATIVE_KEYWORDS = [
+    "slow", "unhelpful", "rude", "terrible", "ignored", 
+    "frustrating", "delayed", "poor", "longer", "minor delays", "distracted"
+]
 
 def keyword_sentiment_analysis(text: str) -> str:
     """
-    Check if any positive keywords are present in the text.
-    Returns 'positive' if any keyword is found, otherwise 'neutral_or_negative'.
+    Detect sentiment based on keywords.
+    Returns 'positive' if positive keywords found,
+            'negative' if negative keywords found,
+            otherwise 'neutral_or_model'.
     """
     text_lower = text.lower()
+    
     for word in POSITIVE_KEYWORDS:
         if word in text_lower:
             return "positive"
-    return "neutral_or_negative"
+    
+    for word in NEGATIVE_KEYWORDS:
+        if word in text_lower:
+            return "negative"
+    
+    return "neutral_or_model"
 
 # -----------------------------
 # Route: Predict Sentiment
 # -----------------------------
 @app.route("/Predict_Sentiment", methods=['POST'])
 def predict_sentiment():
-    """
-    Hybrid sentiment:
-    - Positive text (keyword detected) → returns positive with model-based probability
-    - Neutral/Negative → returns LR prediction and probability
-    Also includes NER results.
-    """
     try:
         claim_json = request.get_json(force=True)
 
@@ -123,7 +133,7 @@ def predict_sentiment():
 
         results_list = []
 
-        # Check for positive keywords
+        # Keyword sentiment
         keyword_sentiment = keyword_sentiment_analysis(claim_text)
 
         # Vectorize text
@@ -132,31 +142,48 @@ def predict_sentiment():
         lr_model_pred_proba = lr_model.predict_proba(vectors_text)[0]
 
         if keyword_sentiment == "positive":
-            # Get probability of positive class dynamically
+            # Positive prediction
             if "positive" in lr_model.classes_:
                 positive_class_index = list(lr_model.classes_).index("positive")
             else:
                 positive_class_index = np.argmax(lr_model_pred_proba)
             positive_score = float(lr_model_pred_proba[positive_class_index])
 
-            positive_result = {
+            result = {
                 'Sentiment_Text': claim_text,
-                'Sentiment_Prediction': "positive",
+                'Sentiment_Prediction': "Positive",
                 'Sentiment_Score': round(positive_score, 2),
                 'NER_Results': ner_results
             }
-            results_list.append(positive_result)
+            results_list.append(result)
+
+        elif keyword_sentiment == "negative":
+            # Negative prediction
+            if "negative" in lr_model.classes_:
+                negative_class_index = list(lr_model.classes_).index("negative")
+            else:
+                negative_class_index = np.argmax(lr_model_pred_proba)
+            negative_score = float(lr_model_pred_proba[negative_class_index])
+
+            result = {
+                'Sentiment_Text': claim_text,
+                'Sentiment_Prediction': "Negative",
+                'Sentiment_Score': round(negative_score, 2),
+                'NER_Results': ner_results
+            }
+            results_list.append(result)
+
         else:
-            # Neutral or negative prediction
+            # Neutral or fallback to model prediction
             lr_model_pred = lr_model.predict(vectors_text)[0]
             max_proba = float(np.max(lr_model_pred_proba))
-            lr_result = {
+            result = {
                 'Sentiment_Text': claim_text,
                 'Sentiment_Prediction': lr_model_pred,
                 'Sentiment_Score': round(max_proba, 3),
                 'NER_Results': ner_results
             }
-            results_list.append(lr_result)
+            results_list.append(result)
 
         # Store in MongoDB
         try:
