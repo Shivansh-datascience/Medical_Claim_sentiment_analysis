@@ -292,150 +292,154 @@
   <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <!-- Inline JS -->
   <script>
-    // Navigation toggle
-    const navDashboard = document.getElementById('navDashboard');
-    const navReports = document.getElementById('navReports');
-    const navSettings = document.getElementById('navSettings');
-    const dashboardSection = document.getElementById('dashboardSection');
-    const reportsSection = document.getElementById('reportsSection');
-    const settingsSection = document.getElementById('settingsSection');
-    navDashboard.addEventListener('click', () => {
-      navDashboard.classList.add('active');
-      navReports.classList.remove('active');
-      navSettings.classList.remove('active');
-      dashboardSection.classList.remove('hidden');
-      reportsSection.classList.add('hidden');
-      settingsSection.classList.add('hidden');
-    });
-    navReports.addEventListener('click', () => {
-      navReports.classList.add('active');
-      navDashboard.classList.remove('active');
-      navSettings.classList.remove('active');
-      dashboardSection.classList.add('hidden');
-      reportsSection.classList.remove('hidden');
-      settingsSection.classList.add('hidden');
-    });
-    navSettings.addEventListener('click', () => {
-      navSettings.classList.add('active');
-      navDashboard.classList.remove('active');
-      navReports.classList.remove('active');
-      dashboardSection.classList.add('hidden');
-      reportsSection.classList.add('hidden');
-      settingsSection.classList.remove('hidden');
-    });
+  // Navigation toggle
+  const navDashboard = document.getElementById('navDashboard');
+  const navReports = document.getElementById('navReports');
+  const navSettings = document.getElementById('navSettings');
+  const dashboardSection = document.getElementById('dashboardSection');
+  const reportsSection = document.getElementById('reportsSection');
+  const settingsSection = document.getElementById('settingsSection');
 
-    // Form and data for demonstration
-    const form = document.getElementById('analysisForm');
-    const textContent = document.getElementById('textContent');
-    const sentimentEl = document.getElementById('sentiment');
-    const confidenceEl = document.getElementById('confidence');
-    const nerList = document.getElementById('nerList');
+  navDashboard.addEventListener('click', () => {
+    navDashboard.classList.add('active');
+    navReports.classList.remove('active');
+    navSettings.classList.remove('active');
+    dashboardSection.classList.remove('hidden');
+    reportsSection.classList.add('hidden');
+    settingsSection.classList.add('hidden');
+  });
 
-    form.addEventListener('submit', async e => {
-      e.preventDefault();
-      const text = document.getElementById('medicalText').value;
+  navReports.addEventListener('click', () => {
+    navReports.classList.add('active');
+    navDashboard.classList.remove('active');
+    navSettings.classList.remove('active');
+    dashboardSection.classList.add('hidden');
+    reportsSection.classList.remove('hidden');
+    settingsSection.classList.add('hidden');
+  });
 
-      // Call your backend API here
-      try {
-        const response = await fetch('http://127.0.0.1:5000/Predict_Sentiment', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ Medical_Claim: text })
-        });
-        const data = await response.json();
+  navSettings.addEventListener('click', () => {
+    navSettings.classList.add('active');
+    navDashboard.classList.remove('active');
+    navReports.classList.remove('active');
+    dashboardSection.classList.add('hidden');
+    reportsSection.classList.add('hidden');
+    settingsSection.classList.remove('hidden');
+  });
 
-        textContent.textContent = data.Sentiment_Text || text;
-        sentimentEl.textContent = `Sentiment: ${data.Sentiment_Prediction ?? '[N/A]'}`;
-        confidenceEl.textContent = `Confidence: ${data.Sentiment_Score !== undefined ? Number(data.Sentiment_Score).toFixed(2) : '[N/A]'}`;
-        nerList.innerHTML = '';
-        if (Array.isArray(data.NER_Results) && data.NER_Results.length) {
-          data.NER_Results.forEach(entity => {
-            const li = document.createElement('li');
-            li.textContent = `${entity.label}: ${entity.text}`;
-            nerList.appendChild(li);
-          });
-        } else {
+  // Form and data
+  const form = document.getElementById('analysisForm');
+  const textContent = document.getElementById('textContent');
+  const sentimentEl = document.getElementById('sentiment');
+  const confidenceEl = document.getElementById('confidence');
+  const nerList = document.getElementById('nerList');
+
+  form.addEventListener('submit', async e => {
+    e.preventDefault();
+    const text = document.getElementById('medicalText').value;
+
+    try {
+      const response = await fetch('http://127.0.0.1:5000/Predict_Sentiment', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ Medical_Claim: text })
+      });
+
+      const data = await response.json();
+
+      // Handle array response from backend
+      const result = Array.isArray(data) ? data[0] : data;
+
+      // Update UI
+      textContent.textContent = result.Sentiment_Text || text;
+      sentimentEl.textContent = `Sentiment: ${result.Sentiment_Prediction ?? '[N/A]'}`;
+      confidenceEl.textContent = `Confidence: ${result.Sentiment_Score !== undefined ? Number(result.Sentiment_Score).toFixed(2) : '[N/A]'}`;
+
+      // Render NER
+      nerList.innerHTML = '';
+      if (Array.isArray(result.NER_Results) && result.NER_Results.length) {
+        result.NER_Results.forEach(entity => {
           const li = document.createElement('li');
-          li.textContent = '[Entity List]';
+          li.textContent = `${entity.label}: ${entity.text}`;
           nerList.appendChild(li);
-        }
-      } catch (err) {
-        textContent.textContent = '[Error analyzing claim]';
-        sentimentEl.textContent = 'Sentiment: [N/A]';
-        confidenceEl.textContent = 'Confidence: [N/A]';
-        nerList.innerHTML = '<li>[Entity List]</li>';
-      }
-    });
-
-    // PDF Generation
-    const { jsPDF } = window.jspdf;
-    const generatePdfBtn = document.getElementById('generatePdfBtn');
-    generatePdfBtn.addEventListener('click', () => {
-      const doc = new jsPDF();
-      doc.setFontSize(20);
-      doc.text("Medical Sentiment Analysis Report", 20, 20);
-      doc.setFontSize(14);
-      doc.text("Analyzed Medical Claim:", 20, 40);
-      doc.setFontSize(12);
-      doc.text(textContent.textContent || 'No data', 20, 50, { maxWidth: 170 });
-      doc.setFontSize(14);
-      doc.text("Sentiment Analysis:", 20, 80);
-      doc.setFontSize(12);
-      doc.text(sentimentEl.textContent || 'No data', 20, 90);
-      doc.text(confidenceEl.textContent || 'No data', 20, 100);
-      doc.setFontSize(14);
-      doc.text("Named Entity Recognition (NER):", 20, 120);
-      doc.setFontSize(12);
-      const nerItems = Array.from(nerList.querySelectorAll('li')).map(li => li.textContent);
-      let y = 130;
-      if (nerItems.length) {
-        nerItems.forEach(item => {
-          if (y > 270) { doc.addPage(); y = 20; }
-          doc.text(`- ${item}`, 20, y);
-          y += 10;
         });
       } else {
-        doc.text('No data', 20, y);
+        const li = document.createElement('li');
+        li.textContent = '[Entity List]';
+        nerList.appendChild(li);
       }
-      doc.save('medical_analysis_report.pdf');
-    });
 
-    // Settings handlers
-    const usernameInput = document.getElementById('usernameInput');
-    const darkModeToggle = document.getElementById('darkModeToggle');
-    const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-    const settingsMessage = document.getElementById('settingsMessage');
-    const userAvatar = document.getElementById('userAvatar');
-    const usernameDisplay = document.getElementById('usernameDisplay');
-    // Load saved settings from localStorage
-    window.addEventListener('DOMContentLoaded', () => {
-      const savedUsername = localStorage.getItem('username') || 'Shvansh Bajpai';
-      const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-      usernameInput.value = savedUsername;
-      usernameDisplay.textContent = savedUsername;
-      userAvatar.textContent = savedUsername.charAt(0).toUpperCase();
-      darkModeToggle.checked = savedDarkMode;
-      if (savedDarkMode) {
-        document.body.classList.add('dark-mode');
-      }
-    });
-    saveSettingsBtn.addEventListener('click', () => {
-      const newUsername = usernameInput.value.trim() || 'Shvansh Bajpai';
-      const darkModeEnabled = darkModeToggle.checked;
-      // Save to localStorage
-      localStorage.setItem('username', newUsername);
-      localStorage.setItem('darkMode', darkModeEnabled);
-      // Update UI immediately
-      usernameDisplay.textContent = newUsername;
-      userAvatar.textContent = newUsername.charAt(0).toUpperCase();
-      if (darkModeEnabled) {
-        document.body.classList.add('dark-mode');
-      } else {
-        document.body.classList.remove('dark-mode');
-      }
-      settingsMessage.textContent = 'Settings saved successfully!';
-      setTimeout(() => { settingsMessage.textContent = ''; }, 2000);
-    });
-  </script>
+    } catch (err) {
+      textContent.textContent = '[Error analyzing claim]';
+      sentimentEl.textContent = 'Sentiment: [N/A]';
+      confidenceEl.textContent = 'Confidence: [N/A]';
+      nerList.innerHTML = '<li>[Entity List]</li>';
+    }
+  });
+
+  // PDF Generation
+  const { jsPDF } = window.jspdf;
+  const generatePdfBtn = document.getElementById('generatePdfBtn');
+  generatePdfBtn.addEventListener('click', () => {
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text("Medical Sentiment Analysis Report", 20, 20);
+    doc.setFontSize(14);
+    doc.text("Analyzed Medical Claim:", 20, 40);
+    doc.setFontSize(12);
+    doc.text(textContent.textContent || 'No data', 20, 50, { maxWidth: 170 });
+    doc.setFontSize(14);
+    doc.text("Sentiment Analysis:", 20, 80);
+    doc.setFontSize(12);
+    doc.text(sentimentEl.textContent || 'No data', 20, 90);
+    doc.text(confidenceEl.textContent || 'No data', 20, 100);
+    doc.setFontSize(14);
+    doc.text("Named Entity Recognition (NER):", 20, 120);
+    doc.setFontSize(12);
+    const nerItems = Array.from(nerList.querySelectorAll('li')).map(li => li.textContent);
+    let y = 130;
+    if (nerItems.length) {
+      nerItems.forEach(item => {
+        if (y > 270) { doc.addPage(); y = 20; }
+        doc.text(`- ${item}`, 20, y);
+        y += 10;
+      });
+    } else {
+      doc.text('No data', 20, y);
+    }
+    doc.save('medical_analysis_report.pdf');
+  });
+
+  // Settings handlers
+  const usernameInput = document.getElementById('usernameInput');
+  const darkModeToggle = document.getElementById('darkModeToggle');
+  const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+  const settingsMessage = document.getElementById('settingsMessage');
+  const userAvatar = document.getElementById('userAvatar');
+  const usernameDisplay = document.getElementById('usernameDisplay');
+
+  window.addEventListener('DOMContentLoaded', () => {
+    const savedUsername = localStorage.getItem('username') || 'Shvansh Bajpai';
+    const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    usernameInput.value = savedUsername;
+    usernameDisplay.textContent = savedUsername;
+    userAvatar.textContent = savedUsername.charAt(0).toUpperCase();
+    darkModeToggle.checked = savedDarkMode;
+    if (savedDarkMode) document.body.classList.add('dark-mode');
+  });
+
+  saveSettingsBtn.addEventListener('click', () => {
+    const newUsername = usernameInput.value.trim() || 'Shvansh Bajpai';
+    const darkModeEnabled = darkModeToggle.checked;
+    localStorage.setItem('username', newUsername);
+    localStorage.setItem('darkMode', darkModeEnabled);
+    usernameDisplay.textContent = newUsername;
+    userAvatar.textContent = newUsername.charAt(0).toUpperCase();
+    if (darkModeEnabled) document.body.classList.add('dark-mode');
+    else document.body.classList.remove('dark-mode');
+    settingsMessage.textContent = 'Settings saved successfully!';
+    setTimeout(() => { settingsMessage.textContent = ''; }, 2000);
+  });
+</script>
 </body>
 </html>
